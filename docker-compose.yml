@@ -1,0 +1,83 @@
+# System under test: Restful Booker Platform (https://github.com/mwinteringham/restful-booker-platform)
+# Images are pinned to a release so a change in the app never breaks this suite by surprise.
+# The published images are linux/amd64 only; Apple Silicon runs them through emulation.
+
+x-java-service: &java-service
+  platform: linux/amd64
+  restart: unless-stopped
+
+x-healthcheck: &healthcheck
+  interval: 5s
+  timeout: 5s
+  retries: 36
+  start_period: 20s
+
+services:
+  rbp-auth:
+    <<: *java-service
+    image: mwinteringham/restfulbookerplatform_auth:2.2
+    ports: ['3004:3004']
+    healthcheck:
+      <<: *healthcheck
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3004/auth/actuator/health']
+
+  rbp-booking:
+    <<: *java-service
+    image: mwinteringham/restfulbookerplatform_booking:2.2
+    ports: ['3000:3000']
+    healthcheck:
+      <<: *healthcheck
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/booking/actuator/health']
+
+  rbp-room:
+    <<: *java-service
+    image: mwinteringham/restfulbookerplatform_room:2.2
+    ports: ['3001:3001']
+    healthcheck:
+      <<: *healthcheck
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3001/room/actuator/health']
+
+  rbp-branding:
+    <<: *java-service
+    image: mwinteringham/restfulbookerplatform_branding:2.2
+    ports: ['3002:3002']
+    healthcheck:
+      <<: *healthcheck
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3002/branding/actuator/health']
+
+  rbp-report:
+    <<: *java-service
+    image: mwinteringham/restfulbookerplatform_report:2.2
+    ports: ['3005:3005']
+    healthcheck:
+      <<: *healthcheck
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3005/report/actuator/health']
+
+  rbp-message:
+    <<: *java-service
+    image: mwinteringham/restfulbookerplatform_message:2.2
+    ports: ['3006:3006']
+    healthcheck:
+      <<: *healthcheck
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3006/message/actuator/health']
+
+  rbp-assets:
+    platform: linux/amd64
+    restart: unless-stopped
+    image: mwinteringham/restfulbookerplatform_assets:2.2
+    # The UI listens on 80 inside the container; 3003 matches the app's own local setup.
+    ports: ['3003:80']
+    depends_on:
+      rbp-auth: { condition: service_healthy }
+      rbp-booking: { condition: service_healthy }
+      rbp-room: { condition: service_healthy }
+      rbp-branding: { condition: service_healthy }
+      rbp-report: { condition: service_healthy }
+      rbp-message: { condition: service_healthy }
+    healthcheck:
+      <<: *healthcheck
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:80/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
